@@ -656,14 +656,8 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
                 dirty |= cgns.var("Candidate Count (K)", mReSTIRParams.neighborCandidateCount, 1u, 128u);
                 cgns.tooltip("Number of disk candidates scored per pixel per iteration.", true);
 
-                dirty |= cgns.var("Visibility Scale Factor", mReSTIRParams.visibilityScaleFactor, 0.001f, 1.0f);
-                cgns.tooltip("Distance scale for position compatibility: s = factor * queryDist.", true);
-
-                dirty |= cgns.var("Position Beta", mReSTIRParams.positionBeta, 0.0f, 8.0f);
-                cgns.tooltip("Exponent on the position compatibility score.", true);
-
-                dirty |= cgns.var("Normal Beta", mReSTIRParams.normalBeta, 0.0f, 32.0f);
-                cgns.tooltip("Exponent on the normal compatibility score.", true);
+                dirty |= cgns.var("Scale Solid Angle (s)", mReSTIRParams.scaleSolidAngle, 0.001f, 1.0f);
+                cgns.tooltip("Solid angle (sr) of the characteristic search disk: s = sqrt(Omega/pi) * depth.", true);
 
                 dirty |= cgns.checkbox("Early Stop on High Compatibility", mReSTIRParams.useNeighborRejection);
                 cgns.tooltip("Stop sampling candidates once one scores above the cutoff.", true);
@@ -2108,9 +2102,7 @@ void CGNS::selectNeighbors(RenderContext* pRenderContext, const RenderData& rend
     var["gSpatialRoundId"]         = (int)iteration;
     var["gNeighborCandidateCount"] = (int)mReSTIRParams.neighborCandidateCount;
     var["gGatherRadius"]           = mReSTIRParams.spatialGatherRadius;
-    var["gVisibilityScaleFactor"]  = mReSTIRParams.visibilityScaleFactor;
-    var["gPositionBeta"]           = mReSTIRParams.positionBeta;
-    var["gNormalBeta"]             = mReSTIRParams.normalBeta;
+    var["gScaleSolidAngle"]        = mReSTIRParams.scaleSolidAngle;
     var["gUseNeighborRejection"]   = mReSTIRParams.useNeighborRejection;
     var["gEarlyStopCutoff"]        = mReSTIRParams.earlyStopCutoff;
 
