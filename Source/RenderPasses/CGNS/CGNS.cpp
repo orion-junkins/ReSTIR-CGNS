@@ -26,7 +26,7 @@
  # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **************************************************************************/
 
-#include "ReservoirSplatting.h"
+#include "CGNS.h"
 #include "RenderGraph/RenderPassHelpers.h"
 #include "RenderGraph/RenderPassStandardFlags.h"
 #include "Rendering/Lights/EmissiveUniformSampler.h"
@@ -34,30 +34,30 @@
 namespace
 {
     const uint kNumPassesWithRNG = 8; // Note: this has to be updated manually.
-    const std::string kReflectTypesFile = "RenderPasses/ReservoirSplatting/ReflectTypes.cs.slang";
+    const std::string kReflectTypesFile = "RenderPasses/CGNS/ReflectTypes.cs.slang";
     // Initial Candidate Generation
-    const std::string kInitialCandidatesFile = "RenderPasses/ReservoirSplatting/InitialCandidates.cs.slang";
+    const std::string kInitialCandidatesFile = "RenderPasses/CGNS/InitialCandidates.cs.slang";
     // Gather Temporal Resampling
-    const std::string kRobustReuseOptimizationFile = "RenderPasses/ReservoirSplatting/RobustReuseOptimization.rt.slang";
-    const std::string kCollectTemporalSamplesFile = "RenderPasses/ReservoirSplatting/CollectTemporalSamples.cs.slang";
-    const std::string kGatherTemporalResamplingFile = "RenderPasses/ReservoirSplatting/GatherTemporalResampling.rt.slang";
+    const std::string kRobustReuseOptimizationFile = "RenderPasses/CGNS/RobustReuseOptimization.rt.slang";
+    const std::string kCollectTemporalSamplesFile = "RenderPasses/CGNS/CollectTemporalSamples.cs.slang";
+    const std::string kGatherTemporalResamplingFile = "RenderPasses/CGNS/GatherTemporalResampling.rt.slang";
     // Scatter Temporal Resampling
-    const std::string kReprojectTemporalSamplesFile = "RenderPasses/ReservoirSplatting/ReprojectTemporalSamples.rt.slang";
-    const std::string kSortReprojectedReservoirsFile = "RenderPasses/ReservoirSplatting/SortReprojectedReservoirs.cs.slang";
-    const std::string kScatterTemporalResamplingFile = "RenderPasses/ReservoirSplatting/ScatterTemporalResampling.rt.slang";
+    const std::string kReprojectTemporalSamplesFile = "RenderPasses/CGNS/ReprojectTemporalSamples.rt.slang";
+    const std::string kSortReprojectedReservoirsFile = "RenderPasses/CGNS/SortReprojectedReservoirs.cs.slang";
+    const std::string kScatterTemporalResamplingFile = "RenderPasses/CGNS/ScatterTemporalResampling.rt.slang";
     // Scatter + Backup Temporal Resampling
-    const std::string kScatterBackupTemporalResamplingFile = "RenderPasses/ReservoirSplatting/ScatterBackupTemporalResampling.rt.slang";
+    const std::string kScatterBackupTemporalResamplingFile = "RenderPasses/CGNS/ScatterBackupTemporalResampling.rt.slang";
     // Multi-Scatter Temporal Resampling
-    const std::string kMultiReprojectTemporalSamplesFile = "RenderPasses/ReservoirSplatting/MultiReprojectTemporalSamples.rt.slang";
-    const std::string kMultiSortReprojectedReservoirsFile = "RenderPasses/ReservoirSplatting/MultiSortReprojectedReservoirs.cs.slang";
-    const std::string kMultiScatterTemporalResamplingFile = "RenderPasses/ReservoirSplatting/MultiScatterTemporalResampling.rt.slang";
+    const std::string kMultiReprojectTemporalSamplesFile = "RenderPasses/CGNS/MultiReprojectTemporalSamples.rt.slang";
+    const std::string kMultiSortReprojectedReservoirsFile = "RenderPasses/CGNS/MultiSortReprojectedReservoirs.cs.slang";
+    const std::string kMultiScatterTemporalResamplingFile = "RenderPasses/CGNS/MultiScatterTemporalResampling.rt.slang";
     // Spatial Resampling
-    const std::string kSpatialResamplingFile = "RenderPasses/ReservoirSplatting/SpatialResampling.rt.slang";
+    const std::string kSpatialResamplingFile = "RenderPasses/CGNS/SpatialResampling.rt.slang";
     // Resolve ReSTIR
-    const std::string kResolveReSTIRFile = "RenderPasses/ReservoirSplatting/ResolveReSTIR.cs.slang";
+    const std::string kResolveReSTIRFile = "RenderPasses/CGNS/ResolveReSTIR.cs.slang";
 
     // Visualization Utility
-    const std::string kVisualizeForwardReprojectionFile = "RenderPasses/ReservoirSplatting/VisualizeForwardReprojection.cs.slang";
+    const std::string kVisualizeForwardReprojectionFile = "RenderPasses/CGNS/VisualizeForwardReprojection.cs.slang";
 
     // Render pass inputs and outputs.
 
@@ -135,33 +135,33 @@ namespace
 
 extern "C" FALCOR_API_EXPORT void registerPlugin(Falcor::PluginRegistry& registry)
 {
-    registry.registerClass<RenderPass, ReservoirSplatting>();
-    ScriptBindings::registerBinding(ReservoirSplatting::registerBindings);
+    registry.registerClass<RenderPass, CGNS>();
+    ScriptBindings::registerBinding(CGNS::registerBindings);
 }
 
-void ReservoirSplatting::registerBindings(pybind11::module& m)
+void CGNS::registerBindings(pybind11::module& m)
 {
-    pybind11::class_<ReservoirSplatting, RenderPass, ref<ReservoirSplatting>> pass(m, "ReservoirSplatting");
-    pass.def("reset", &ReservoirSplatting::reset);
-    pass.def_property_readonly("pixelStats", &ReservoirSplatting::getPixelStats);
+    pybind11::class_<CGNS, RenderPass, ref<CGNS>> pass(m, "CGNS");
+    pass.def("reset", &CGNS::reset);
+    pass.def_property_readonly("pixelStats", &CGNS::getPixelStats);
 
     pass.def_property("useFixedSeed",
-        [](const ReservoirSplatting* pt) { return pt->mParams.useFixedSeed ? true : false; },
-        [](ReservoirSplatting* pt, bool value) { pt->mParams.useFixedSeed = value ? 1 : 0; }
+        [](const CGNS* pt) { return pt->mParams.useFixedSeed ? true : false; },
+        [](CGNS* pt, bool value) { pt->mParams.useFixedSeed = value ? 1 : 0; }
     );
     pass.def_property("fixedSeed",
-        [](const ReservoirSplatting* pt) { return pt->mParams.fixedSeed; },
-        [](ReservoirSplatting* pt, uint32_t value) { pt->mParams.fixedSeed = value; }
+        [](const CGNS* pt) { return pt->mParams.fixedSeed; },
+        [](CGNS* pt, uint32_t value) { pt->mParams.fixedSeed = value; }
     );
 }
 
-ReservoirSplatting::ReservoirSplatting(ref<Device> pDevice, const Properties& props)
+CGNS::CGNS(ref<Device> pDevice, const Properties& props)
     : RenderPass(pDevice)
 {
     if (!mpDevice->isShaderModelSupported(ShaderModel::SM6_5))
-        FALCOR_THROW("ReservoirSplatting requires Shader Model 6.5 support.");
+        FALCOR_THROW("CGNS requires Shader Model 6.5 support.");
     if (!mpDevice->isFeatureSupported(Device::SupportedFeatures::RaytracingTier1_1))
-        FALCOR_THROW("ReservoirSplatting requires Raytracing Tier 1.1 support.");
+        FALCOR_THROW("CGNS requires Raytracing Tier 1.1 support.");
 
     parseProperties(props);
     validateOptions();
@@ -179,7 +179,7 @@ ReservoirSplatting::ReservoirSplatting(ref<Device> pDevice, const Properties& pr
     mpPixelDebug = std::make_unique<PixelDebug>(mpDevice);
 }
 
-void ReservoirSplatting::setProperties(const Properties& props)
+void CGNS::setProperties(const Properties& props)
 {
     parseProperties(props);
     validateOptions();
@@ -189,7 +189,7 @@ void ReservoirSplatting::setProperties(const Properties& props)
     mOptionsChanged = true;
 }
 
-void ReservoirSplatting::parseProperties(const Properties& props)
+void CGNS::parseProperties(const Properties& props)
 {
     for (const auto& [key, value] : props)
     {
@@ -232,7 +232,7 @@ void ReservoirSplatting::parseProperties(const Properties& props)
         else if (key == kGatherOption) mReSTIRParams.temporalGathering = value;
         else if (key == kNumTimePartitions) mReSTIRParams.numTimePartitions = value;
 
-        else logWarning("Unknown property '{}' in ReservoirSplatting properties.", key);
+        else logWarning("Unknown property '{}' in CGNS properties.", key);
     }
 
     if (props.has(kMaxSurfaceBounces))
@@ -260,7 +260,7 @@ void ReservoirSplatting::parseProperties(const Properties& props)
     }
 }
 
-void ReservoirSplatting::validateOptions()
+void CGNS::validateOptions()
 {
     if (mParams.specularRoughnessThreshold < 0.f || mParams.specularRoughnessThreshold > 1.f)
     {
@@ -300,7 +300,7 @@ void ReservoirSplatting::validateOptions()
     }
 }
 
-Properties ReservoirSplatting::getProperties() const
+Properties CGNS::getProperties() const
 {
     if (auto lightBVHSampler = dynamic_cast<LightBVHSampler*>(mpEmissiveSampler.get()))
     {
@@ -343,7 +343,7 @@ Properties ReservoirSplatting::getProperties() const
     return props;
 }
 
-RenderPassReflection ReservoirSplatting::reflect(const CompileData& compileData)
+RenderPassReflection CGNS::reflect(const CompileData& compileData)
 {
     RenderPassReflection reflector;
     const uint2 sz = RenderPassHelpers::calculateIOSize(mOutputSizeSelection, mFixedOutputSize, compileData.defaultTexDims);
@@ -353,7 +353,7 @@ RenderPassReflection ReservoirSplatting::reflect(const CompileData& compileData)
     return reflector;
 }
 
-void ReservoirSplatting::setFrameDim(const uint2 frameDim)
+void CGNS::setFrameDim(const uint2 frameDim)
 {
     auto prevFrameDim = mParams.frameDim;
     auto prevScreenTiles = mParams.screenTiles;
@@ -375,7 +375,7 @@ void ReservoirSplatting::setFrameDim(const uint2 frameDim)
     }
 }
 
-void ReservoirSplatting::setScene(RenderContext* pRenderContext, const ref<Scene>& pScene)
+void CGNS::setScene(RenderContext* pRenderContext, const ref<Scene>& pScene)
 {
     mpScene = pScene;
     mParams.frameCount = 0;
@@ -389,14 +389,14 @@ void ReservoirSplatting::setScene(RenderContext* pRenderContext, const ref<Scene
     {
         if (pScene->hasGeometryType(Scene::GeometryType::Custom))
         {
-            logWarning("ReservoirSplatting: This render pass does not support custom primitives.");
+            logWarning("CGNS: This render pass does not support custom primitives.");
         }
 
         validateOptions();
     }
 }
 
-void ReservoirSplatting::execute(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::execute(RenderContext* pRenderContext, const RenderData& renderData)
 {
     if (!beginFrame(pRenderContext, renderData))
         return;
@@ -508,7 +508,7 @@ void ReservoirSplatting::execute(RenderContext* pRenderContext, const RenderData
     endFrame(pRenderContext, renderData);
 }
 
-void ReservoirSplatting::renderUI(Gui::Widgets& widget)
+void CGNS::renderUI(Gui::Widgets& widget)
 {
     bool dirty = false;
 
@@ -542,7 +542,7 @@ void ReservoirSplatting::renderUI(Gui::Widgets& widget)
     }
 }
 
-bool ReservoirSplatting::renderScatterVisualizationUI(Gui::Widgets& widget)
+bool CGNS::renderScatterVisualizationUI(Gui::Widgets& widget)
 {
     bool dirty = false;
 
@@ -561,7 +561,7 @@ bool ReservoirSplatting::renderScatterVisualizationUI(Gui::Widgets& widget)
     return dirty;
 }
 
-bool ReservoirSplatting::renderReSTIRUI(Gui::Widgets& widget)
+bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
 {
     bool dirty = false;
 
@@ -654,7 +654,7 @@ bool ReservoirSplatting::renderReSTIRUI(Gui::Widgets& widget)
     return dirty;
 }
 
-bool ReservoirSplatting::renderRenderingUI(Gui::Widgets& widget)
+bool CGNS::renderRenderingUI(Gui::Widgets& widget)
 {
     bool dirty = false;
     bool runtimeDirty = false;
@@ -782,7 +782,7 @@ bool ReservoirSplatting::renderRenderingUI(Gui::Widgets& widget)
     return dirty || runtimeDirty;
 }
 
-bool ReservoirSplatting::renderDebugUI(Gui::Widgets& widget)
+bool CGNS::renderDebugUI(Gui::Widgets& widget)
 {
     bool dirty = false;
 
@@ -799,18 +799,18 @@ bool ReservoirSplatting::renderDebugUI(Gui::Widgets& widget)
     return dirty;
 }
 
-void ReservoirSplatting::renderStatsUI(Gui::Widgets& widget)
+void CGNS::renderStatsUI(Gui::Widgets& widget)
 {
     // Show ray stats
     mpPixelStats->renderUI(widget);
 }
 
-bool ReservoirSplatting::onMouseEvent(const MouseEvent& mouseEvent)
+bool CGNS::onMouseEvent(const MouseEvent& mouseEvent)
 {
     return mpPixelDebug->onMouseEvent(mouseEvent);
 }
 
-void ReservoirSplatting::reset()
+void CGNS::reset()
 {
     if (mpScene && !mpScene->isFrozen())
     {
@@ -819,7 +819,7 @@ void ReservoirSplatting::reset()
     }
 }
 
-ReservoirSplatting::TracePass::TracePass(ref<Device> pDevice, const std::string& filename, const std::string& name, const std::string& passDefine, const ref<Scene>& pScene, const DefineList& defines, const TypeConformanceList& globalTypeConformances)
+CGNS::TracePass::TracePass(ref<Device> pDevice, const std::string& filename, const std::string& name, const std::string& passDefine, const ref<Scene>& pScene, const DefineList& defines, const TypeConformanceList& globalTypeConformances)
     : name(name)
     , passDefine(passDefine)
 {
@@ -899,7 +899,7 @@ ReservoirSplatting::TracePass::TracePass(ref<Device> pDevice, const std::string&
     pProgram = Program::create(pDevice, desc, defines);
 }
 
-void ReservoirSplatting::TracePass::prepareProgram(ref<Device> pDevice, const DefineList& defines)
+void CGNS::TracePass::prepareProgram(ref<Device> pDevice, const DefineList& defines)
 {
     FALCOR_ASSERT(pProgram != nullptr && pBindingTable != nullptr);
     pProgram->setDefines(defines);
@@ -907,7 +907,7 @@ void ReservoirSplatting::TracePass::prepareProgram(ref<Device> pDevice, const De
     pVars = RtProgramVars::create(pDevice, pProgram, pBindingTable);
 }
 
-void ReservoirSplatting::resetPrograms()
+void CGNS::resetPrograms()
 {
     mpInitialCandidatesPass = nullptr;
     mpRobustReuseOptimizationPass = nullptr;
@@ -930,7 +930,7 @@ void ReservoirSplatting::resetPrograms()
     mRecompile = true;
 }
 
-void ReservoirSplatting::updatePrograms()
+void CGNS::updatePrograms()
 {
     FALCOR_ASSERT(mpScene);
 
@@ -1069,7 +1069,7 @@ void ReservoirSplatting::updatePrograms()
     mRecompile = false;
 }
 
-ref<Texture> ReservoirSplatting::createNeighborOffsetTexture(const uint32_t sampleCount)
+ref<Texture> CGNS::createNeighborOffsetTexture(const uint32_t sampleCount)
 {
     std::unique_ptr<int8_t[]> offsets(new int8_t[sampleCount * 2]);
     const int R = 254;
@@ -1096,7 +1096,7 @@ ref<Texture> ReservoirSplatting::createNeighborOffsetTexture(const uint32_t samp
     return mpDevice->createTexture1D(sampleCount, ResourceFormat::RG8Snorm, 1, 1, offsets.get());
 }
 
-void ReservoirSplatting::prepareResources(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::prepareResources(RenderContext* pRenderContext, const RenderData& renderData)
 {
     FALCOR_ASSERT(mpScene);
 
@@ -1342,7 +1342,7 @@ void ReservoirSplatting::prepareResources(RenderContext* pRenderContext, const R
     }
 }
 
-void ReservoirSplatting::preparePathTracer(const RenderData& renderData)
+void CGNS::preparePathTracer(const RenderData& renderData)
 {
     // Create path tracer parameter block if needed.
     if (!mpPathTracerBlock || mVarsChanged)
@@ -1357,7 +1357,7 @@ void ReservoirSplatting::preparePathTracer(const RenderData& renderData)
     bindShaderData(var, renderData);
 }
 
-void ReservoirSplatting::prepareCameraManager(const RenderData& renderData, bool shouldReset)
+void CGNS::prepareCameraManager(const RenderData& renderData, bool shouldReset)
 {
     // Create the camera manager parameter block if needed.
     if (!mpCameraManagerBlock || mVarsChanged)
@@ -1387,7 +1387,7 @@ void ReservoirSplatting::prepareCameraManager(const RenderData& renderData, bool
     }
 }
 
-void ReservoirSplatting::prepareGatherData(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::prepareGatherData(RenderContext* pRenderContext, const RenderData& renderData)
 {
     // Create the gather data parameter block if needed.
     if (!mpGatherDataBlock || mVarsChanged)
@@ -1404,7 +1404,7 @@ void ReservoirSplatting::prepareGatherData(RenderContext* pRenderContext, const 
     var["floatingCoords"] = mpFloatingCoordinates;
 }
 
-void ReservoirSplatting::resetLighting()
+void CGNS::resetLighting()
 {
     // Retain the options for the emissive sampler.
     if (auto lightBVHSampler = dynamic_cast<LightBVHSampler*>(mpEmissiveSampler.get()))
@@ -1417,7 +1417,7 @@ void ReservoirSplatting::resetLighting()
     mRecompile = true;
 }
 
-void ReservoirSplatting::prepareMaterials(RenderContext* pRenderContext)
+void CGNS::prepareMaterials(RenderContext* pRenderContext)
 {
     // This functions checks for scene changes that require shader recompilation.
     // Whenever materials or geometry is added/removed to the scene, we reset the shader programs to trigger
@@ -1430,7 +1430,7 @@ void ReservoirSplatting::prepareMaterials(RenderContext* pRenderContext)
     }
 }
 
-bool ReservoirSplatting::prepareLighting(RenderContext* pRenderContext)
+bool CGNS::prepareLighting(RenderContext* pRenderContext)
 {
     bool lightingChanged = false;
 
@@ -1529,7 +1529,7 @@ bool ReservoirSplatting::prepareLighting(RenderContext* pRenderContext)
     return lightingChanged;
 }
 
-void ReservoirSplatting::bindShaderData(const ShaderVar& var, const RenderData& renderData, bool useLightSampling) const
+void CGNS::bindShaderData(const ShaderVar& var, const RenderData& renderData, bool useLightSampling) const
 {
     // Bind static resources that don't change per frame.
     if (mVarsChanged)
@@ -1547,7 +1547,7 @@ void ReservoirSplatting::bindShaderData(const ShaderVar& var, const RenderData& 
     }
 }
 
-bool ReservoirSplatting::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
+bool CGNS::beginFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
     const auto& pOutputColor = renderData.getTexture(kOutputColor);
     FALCOR_ASSERT(pOutputColor);
@@ -1570,7 +1570,7 @@ bool ReservoirSplatting::beginFrame(RenderContext* pRenderContext, const RenderD
 
     if (mEnabled && resolutionMismatch)
     {
-        logError("ReservoirSplatting I/O sizes don't match. The pass will be disabled.");
+        logError("CGNS I/O sizes don't match. The pass will be disabled.");
         mEnabled = false;
     }
 
@@ -1645,7 +1645,7 @@ bool ReservoirSplatting::beginFrame(RenderContext* pRenderContext, const RenderD
     return true;
 }
 
-void ReservoirSplatting::endFrame(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::endFrame(RenderContext* pRenderContext, const RenderData& renderData)
 {
     mpPixelStats->endFrame(pRenderContext);
     mpPixelDebug->endFrame(pRenderContext);
@@ -1679,7 +1679,7 @@ void ReservoirSplatting::endFrame(RenderContext* pRenderContext, const RenderDat
     }
 }
 
-void ReservoirSplatting::tracePass(RenderContext* pRenderContext, const RenderData& renderData, TracePass& tracePass, uint z)
+void CGNS::tracePass(RenderContext* pRenderContext, const RenderData& renderData, TracePass& tracePass, uint z)
 {
     FALCOR_PROFILE(pRenderContext, tracePass.name);
 
@@ -1702,7 +1702,7 @@ void ReservoirSplatting::tracePass(RenderContext* pRenderContext, const RenderDa
     mpScene->raytrace(pRenderContext, tracePass.pProgram.get(), tracePass.pVars, uint3(mParams.frameDim, z));
 }
 
-void ReservoirSplatting::initialCandidateGeneration(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::initialCandidateGeneration(RenderContext* pRenderContext, const RenderData& renderData)
 {
     FALCOR_PROFILE(pRenderContext, "initialCandidates");
 
@@ -1721,7 +1721,7 @@ void ReservoirSplatting::initialCandidateGeneration(RenderContext* pRenderContex
     //tracePass(pRenderContext, renderData, *mpInitialCandidatesPass);
 }
 
-void ReservoirSplatting::robustReuseOptimization(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::robustReuseOptimization(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto var = mpRobustReuseOptimizationPass->pVars->getRootVar()["CB"]["gRobustReuseOptimization"];
     var["params"].setBlob(mParams);
@@ -1732,7 +1732,7 @@ void ReservoirSplatting::robustReuseOptimization(RenderContext* pRenderContext, 
     tracePass(pRenderContext, renderData, *mpRobustReuseOptimizationPass);
 }
 
-void ReservoirSplatting::collectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::collectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
 {
     FALCOR_PROFILE(pRenderContext, "collectTemporalSamples");
 
@@ -1756,7 +1756,7 @@ void ReservoirSplatting::collectTemporalSamples(RenderContext* pRenderContext, c
     mpCollectTemporalSamplesPass->execute(pRenderContext, {mParams.frameDim, 1u});
 }
 
-void ReservoirSplatting::reprojectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::reprojectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
 {
     // Make sure the global counters are reset.
     pRenderContext->clearUAV(mpGlobalCounters->getUAV().get(), uint4(0));
@@ -1774,7 +1774,7 @@ void ReservoirSplatting::reprojectTemporalSamples(RenderContext* pRenderContext,
     tracePass(pRenderContext, renderData, *mpReprojectTemporalSamplesPass);
 }
 
-void ReservoirSplatting::multiReprojectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::multiReprojectTemporalSamples(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto var = mpMultiReprojectTemporalSamplesPass->pVars->getRootVar()["CB"]["gMultiReprojectTemporalSamples"];
     var["params"].setBlob(mParams);
@@ -1796,7 +1796,7 @@ void ReservoirSplatting::multiReprojectTemporalSamples(RenderContext* pRenderCon
     tracePass(pRenderContext, renderData, *mpMultiReprojectTemporalSamplesPass);
 }
 
-void ReservoirSplatting::sortReprojectedReservoirs(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::sortReprojectedReservoirs(RenderContext* pRenderContext, const RenderData& renderData)
 {
     uint32_t cellCount = mParams.frameDim.x * mParams.frameDim.y;
 
@@ -1839,7 +1839,7 @@ void ReservoirSplatting::sortReprojectedReservoirs(RenderContext* pRenderContext
     }
 }
 
-void ReservoirSplatting::multiSortReprojectedReservoirs(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::multiSortReprojectedReservoirs(RenderContext* pRenderContext, const RenderData& renderData)
 {
     uint32_t cellCount = mParams.frameDim.x * mParams.frameDim.y;
 
@@ -1890,7 +1890,7 @@ void ReservoirSplatting::multiSortReprojectedReservoirs(RenderContext* pRenderCo
     }
 }
 
-void ReservoirSplatting::visualizeForwardReprojection(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::visualizeForwardReprojection(RenderContext* pRenderContext, const RenderData& renderData)
 {
     FALCOR_PROFILE(pRenderContext, "visualizeForwardReprojection");
 
@@ -1913,7 +1913,7 @@ void ReservoirSplatting::visualizeForwardReprojection(RenderContext* pRenderCont
     mpVisualizeForwardReprojectionPass->execute(pRenderContext, {mParams.frameDim, 1u});
 }
 
-void ReservoirSplatting::gatherTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::gatherTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto vars = mpGatherTemporalResamplingPass->pVars->getRootVar();
     vars["gGatherData"] = mpGatherDataBlock;
@@ -1930,7 +1930,7 @@ void ReservoirSplatting::gatherTemporalResampling(RenderContext* pRenderContext,
     tracePass(pRenderContext, renderData, *mpGatherTemporalResamplingPass);
 }
 
-void ReservoirSplatting::scatterTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::scatterTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto var = mpScatterTemporalResamplingPass->pVars->getRootVar()["CB"]["gScatterTemporalResampling"];
     var["params"].setBlob(mParams);
@@ -1947,7 +1947,7 @@ void ReservoirSplatting::scatterTemporalResampling(RenderContext* pRenderContext
     tracePass(pRenderContext, renderData, *mpScatterTemporalResamplingPass);
 }
 
-void ReservoirSplatting::multiScatterTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::multiScatterTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto var = mpMultiScatterTemporalResamplingPass->pVars->getRootVar()["CB"]["gMultiScatterTemporalResampling"];
     var["params"].setBlob(mParams);
@@ -1969,7 +1969,7 @@ void ReservoirSplatting::multiScatterTemporalResampling(RenderContext* pRenderCo
     tracePass(pRenderContext, renderData, *mpMultiScatterTemporalResamplingPass);
 }
 
-void ReservoirSplatting::scatterBackupTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::scatterBackupTemporalResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto vars = mpScatterBackupTemporalResamplingPass->pVars->getRootVar();
     vars["gGatherData"] = mpGatherDataBlock;
@@ -1991,7 +1991,7 @@ void ReservoirSplatting::scatterBackupTemporalResampling(RenderContext* pRenderC
     tracePass(pRenderContext, renderData, *mpScatterBackupTemporalResamplingPass);
 }
 
-void ReservoirSplatting::spatialResampling(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     auto var = mpSpatialResamplingPass->pVars->getRootVar()["CB"]["gSpatialResampling"];
     var["params"].setBlob(mParams);
@@ -2019,7 +2019,7 @@ void ReservoirSplatting::spatialResampling(RenderContext* pRenderContext, const 
     }
 }
 
-void ReservoirSplatting::resolveReSTIR(RenderContext* pRenderContext, const RenderData& renderData)
+void CGNS::resolveReSTIR(RenderContext* pRenderContext, const RenderData& renderData)
 {
     FALCOR_PROFILE(pRenderContext, "resolveReSTIR");
 
@@ -2036,7 +2036,7 @@ void ReservoirSplatting::resolveReSTIR(RenderContext* pRenderContext, const Rend
     mpResolveReSTIRPass->execute(pRenderContext, {mParams.frameDim, 1u});
 }
 
-DefineList ReservoirSplatting::StaticParams::getDefines(const ReservoirSplatting& owner) const
+DefineList CGNS::StaticParams::getDefines(const CGNS& owner) const
 {
     DefineList defines;
 

@@ -1,8 +1,8 @@
-add_plugin(ReservoirSplatting)
+add_plugin(CGNS)
 
-target_sources(ReservoirSplatting PRIVATE
-    ReservoirSplatting.cpp
-    ReservoirSplatting.h
+target_sources(CGNS PRIVATE
+    CGNS.cpp
+    CGNS.h
     # Common Utility
     CameraManager.slang
     LoadShadingData.slang
@@ -42,6 +42,6 @@ target_sources(ReservoirSplatting PRIVATE
     VisualizeForwardReprojection.cs.slang
 )
 
-target_copy_shaders(ReservoirSplatting RenderPasses/ReservoirSplatting)
+target_copy_shaders(CGNS RenderPasses/CGNS)
 
-target_source_group(ReservoirSplatting "RenderPasses")
+target_source_group(CGNS "RenderPasses")

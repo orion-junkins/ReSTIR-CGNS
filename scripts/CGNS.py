@@ -1,7 +1,7 @@
 from falcor import *
 
-def render_graph_ReservoirSplatting():
-    g = RenderGraph("ReservoirSplatting")
+def render_graph_CGNS():
+    g = RenderGraph("CGNS")
 
     VBufferParams = {
         'samplePattern': "Center",
@@ -10,7 +10,7 @@ def render_graph_ReservoirSplatting():
         'useDOF' : False
     }
 
-    ReservoirSplattingParams = {
+    CGNSParams = {
         'samplesPerPixel': 1,
         'enableTemporalResampling': True,
         'enableSpatialResampling': True,
@@ -22,18 +22,18 @@ def render_graph_ReservoirSplatting():
 
     VBufferRT = createPass("VBufferRT", VBufferParams)
     g.addPass(VBufferRT, "VBufferRT")
-    ReservoirSplatting = createPass("ReservoirSplatting", ReservoirSplattingParams)
-    g.addPass(ReservoirSplatting, "ReservoirSplatting")
+    CGNS = createPass("CGNS", CGNSParams)
+    g.addPass(CGNS, "CGNS")
     AccumulatePass = createPass("AccumulatePass", {'enabled': False, 'precisionMode': 'Single'})
     g.addPass(AccumulatePass, "AccumulatePass")
     ToneMapper = createPass("ToneMapper", {'autoExposure': False, 'exposureCompensation': 0.0})
     g.addPass(ToneMapper, "ToneMapper")
     FrameDumper = createPass("FrameDumper")
     g.addPass(FrameDumper, "FrameDumper")
-    g.addEdge("VBufferRT.vbuffer", "ReservoirSplatting.vbuffer")
+    g.addEdge("VBufferRT.vbuffer", "CGNS.vbuffer")
     # g.addEdge("VBufferRT.viewW", "PathTracer.viewW")
-    g.addEdge("VBufferRT.mvec", "ReservoirSplatting.mvec")
-    g.addEdge("ReservoirSplatting.color", "AccumulatePass.input")
+    g.addEdge("VBufferRT.mvec", "CGNS.mvec")
+    g.addEdge("CGNS.color", "AccumulatePass.input")
     g.addEdge("AccumulatePass.output", "ToneMapper.src")
     # g.markOutput("ToneMapper.dst")
     g.addEdge("ToneMapper.dst", "FrameDumper.src")
@@ -41,6 +41,6 @@ def render_graph_ReservoirSplatting():
     g.markOutput("AccumulatePass.output")
     return g
 
-ReservoirSplatting = render_graph_ReservoirSplatting()
-try: m.addGraph(ReservoirSplatting)
+CGNS = render_graph_CGNS()
+try: m.addGraph(CGNS)
 except NameError: None

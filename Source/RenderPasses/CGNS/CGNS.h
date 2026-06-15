@@ -45,14 +45,14 @@ using namespace Falcor;
 
 /** Fast path tracer.
 */
-class ReservoirSplatting : public RenderPass
+class CGNS : public RenderPass
 {
 public:
-    FALCOR_PLUGIN_CLASS(ReservoirSplatting, "ReservoirSplatting", "Path Tracer with Reservoir Splatting");
+    FALCOR_PLUGIN_CLASS(CGNS, "CGNS", "Compatibility-Guided Neighbor Selection");
 
-    static ref<ReservoirSplatting> create(ref<Device> pDevice, const Properties& props) { return make_ref<ReservoirSplatting>(pDevice, props); }
+    static ref<CGNS> create(ref<Device> pDevice, const Properties& props) { return make_ref<CGNS>(pDevice, props); }
 
-    ReservoirSplatting(ref<Device> pDevice, const Properties& props);
+    CGNS(ref<Device> pDevice, const Properties& props);
 
     virtual void setProperties(const Properties& props) override;
     virtual Properties getProperties() const override;
@@ -148,7 +148,7 @@ private:
         // Output parameters
         ColorFormat colorFormat = ColorFormat::LogLuvHDR;       ///< Color format used for internal per-sample color and denoiser buffers.
 
-        DefineList getDefines(const ReservoirSplatting& owner) const;
+        DefineList getDefines(const CGNS& owner) const;
     };
 
     /** Changes in camera parameters generally don't need shader recompilation.
