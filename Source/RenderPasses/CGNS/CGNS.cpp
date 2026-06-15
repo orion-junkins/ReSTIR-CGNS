@@ -648,6 +648,9 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
             dirty |= spatial.checkbox("Enable Confidence Weights Spatially", mReSTIRParams.useConfidenceWeightsSpatially);
             spatial.tooltip("Use confidence weights during spatial resampling.", true);
 
+            dirty |= spatial.checkbox("Enable Geometry Rejection", mReSTIRParams.enableGeometryRejection);
+            spatial.tooltip("Reject neighbors whose normals diverge by more than 60° or depths by more than 10%.", true);
+
             if (auto cgns = spatial.group("CGNS Neighbor Selection", false))
             {
                 dirty |= cgns.var("Candidate Count (K)", mReSTIRParams.neighborCandidateCount, 1u, 128u);
@@ -2120,9 +2123,11 @@ void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& re
 
     auto var = mpSpatialResamplingPass->pVars->getRootVar()["CB"]["gSpatialResampling"];
     var["params"].setBlob(mParams);
-    var["useConfidenceWeights"] = mReSTIRParams.useConfidenceWeightsSpatially;
-    var["neighborCount"] = mReSTIRParams.neighborCount;
-    var["neighborSelections"] = mpNeighborSelections;
+    var["useConfidenceWeights"]      = mReSTIRParams.useConfidenceWeightsSpatially;
+    var["neighborCount"]             = mReSTIRParams.neighborCount;
+    var["neighborSelections"]        = mpNeighborSelections;
+    var["cgnsGBuffer"]               = mpCgnsGBuffer;
+    var["enableGeometryRejection"]   = mReSTIRParams.enableGeometryRejection;
 
     ref<Buffer>& pSwapReservoirs = mpScene->isFrozen() ? mpTempReservoirs : mpPrevReservoirs;
     ref<Buffer>& pSwapReconnectionData = mpScene->isFrozen() ? mpTempReconnectionData : mpPrevReconnectionData;

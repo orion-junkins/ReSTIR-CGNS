@@ -51,6 +51,8 @@ struct SpatialResampling
     uint32_t neighborCount;
 
     StructuredBuffer<int2> neighborSelections;
+    Texture2D<float4>      cgnsGBuffer;         ///< (world normal xyz, cam-dist); dist==0 → env hit
+    bool                   enableGeometryRejection;
 
     StructuredBuffer<ReconnectionData> prevReconnectionData;
     StructuredBuffer<PathReservoir> prevReservoirs;
@@ -104,6 +106,11 @@ struct SpatialResampling
         PathReservoir dstReservoir = PathReservoir();
         ReconnectionData dstReconnectionData = ReconnectionData();
 
+        // Read central G-buffer once for geometry rejection checks.
+        float4 centralBuf  = cgnsGBuffer[pixel];
+        float3 centralNorm = centralBuf.xyz;
+        float  centralDist = centralBuf.w;
+
         int validNeighbors = 0;
         for (uint32_t i = 0; i < neighborCount; i++)
         {
@@ -113,6 +120,23 @@ struct SpatialResampling
             // Get the CGNS pre-selected neighbor pixel.
             int2 neighborPixel = neighborSelections[reservoirIdx];
             if (!params.validateIntegerPixelBounds(neighborPixel)) continue;
+
+            // Geometry rejection: discard neighbors with incompatible normals or depths.
+            if (enableGeometryRejection)
+            {
+                float4 neighborBuf   = cgnsGBuffer[neighborPixel];
+                float3 neighborNorm  = neighborBuf.xyz;
+                float  neighborDist  = neighborBuf.w;
+                bool   centralSurf   = centralDist  > 0.0f;
+                bool   neighborSurf  = neighborDist > 0.0f;
+                if (centralSurf != neighborSurf) continue; // surface/env mismatch
+                if (centralSurf)
+                {
+                    if (dot(centralNorm, neighborNorm) < 0.5f)                    continue;
+                    if (abs(centralDist - neighborDist) >= 0.1f * centralDist)    continue;
+                }
+            }
+
             validNeighbors += 1;
 
             uint32_t neighborIdx = params.linearizePixel(neighborPixel);

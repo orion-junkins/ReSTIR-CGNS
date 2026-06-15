@@ -181,6 +181,7 @@ private:
         float spatialGatherRadius = 30.0f;                                      ///< Radius for spatial reuse.
         uint32_t neighborCount = 1;                                             ///< Number of neighbors to consider for spatial resampling (for a given iteration).
         bool useConfidenceWeightsSpatially = true;                              ///< Toggle for using confidence weights during spatial resampling.
+        bool enableGeometryRejection = true;                                    ///< Reject neighbors whose normals or depths diverge too far from the central pixel.
 
         // CGNS — neighbor pre-selection
         uint32_t neighborCandidateCount = 32;       ///< K: number of candidates scored per pixel per iteration.
