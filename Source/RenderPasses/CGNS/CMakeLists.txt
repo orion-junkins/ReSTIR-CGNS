@@ -40,6 +40,8 @@ target_sources(CGNS PRIVATE
     ResolveReSTIR.cs.slang
     # Visualization Utility
     VisualizeForwardReprojection.cs.slang
+    # CGNS - Compatibility-Guided Neighbor Selection
+    CGNSUtils.slang
 )
 
 target_copy_shaders(CGNS RenderPasses/CGNS)
