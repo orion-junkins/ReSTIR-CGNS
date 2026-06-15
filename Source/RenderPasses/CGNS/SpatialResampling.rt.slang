@@ -49,9 +49,8 @@ struct SpatialResampling
 
     uint32_t iteration;
     uint32_t neighborCount;
-    Texture1D<float2> neighborOffsets;
 
-    float gatherRadius;
+    StructuredBuffer<int2> neighborSelections;
 
     StructuredBuffer<ReconnectionData> prevReconnectionData;
     StructuredBuffer<PathReservoir> prevReservoirs;
@@ -106,15 +105,13 @@ struct SpatialResampling
         ReconnectionData dstReconnectionData = ReconnectionData();
 
         int validNeighbors = 0;
-        uint32_t startIdx = sampleNext1D(sg) * kSpatialNeighborSamples;
         for (uint32_t i = 0; i < neighborCount; i++)
         {
             // Lens vertex copy or primary hit reconnection, depending on which index we're at.
             bool lensVertexCopyShift = (i < numLensVertexCopyShifts);
 
-            // Get the neighbor pixel.
-            uint32_t neighborOffsetIdx = (startIdx + i) % kSpatialNeighborSamples;
-            int2 neighborPixel = int2(round(float2(pixel) + gatherRadius * neighborOffsets[neighborOffsetIdx]));
+            // Get the CGNS pre-selected neighbor pixel.
+            int2 neighborPixel = neighborSelections[reservoirIdx];
             if (!params.validateIntegerPixelBounds(neighborPixel)) continue;
             validNeighbors += 1;
 

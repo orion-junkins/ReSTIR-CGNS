@@ -2098,8 +2098,7 @@ void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& re
     var["params"].setBlob(mParams);
     var["useConfidenceWeights"] = mReSTIRParams.useConfidenceWeightsSpatially;
     var["neighborCount"] = mReSTIRParams.neighborCount;
-    var["neighborOffsets"] = mpNeighborOffsets;
-    var["gatherRadius"] = mReSTIRParams.spatialGatherRadius;
+    var["neighborSelections"] = mpNeighborSelections;
 
     ref<Buffer>& pSwapReservoirs = mpScene->isFrozen() ? mpTempReservoirs : mpPrevReservoirs;
     ref<Buffer>& pSwapReconnectionData = mpScene->isFrozen() ? mpTempReconnectionData : mpPrevReconnectionData;
