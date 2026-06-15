@@ -647,6 +647,30 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
 
             dirty |= spatial.checkbox("Enable Confidence Weights Spatially", mReSTIRParams.useConfidenceWeightsSpatially);
             spatial.tooltip("Use confidence weights during spatial resampling.", true);
+
+            if (auto cgns = spatial.group("CGNS Neighbor Selection", false))
+            {
+                dirty |= cgns.var("Candidate Count (K)", mReSTIRParams.neighborCandidateCount, 1u, 128u);
+                cgns.tooltip("Number of disk candidates scored per pixel per iteration.", true);
+
+                dirty |= cgns.var("Visibility Scale Factor", mReSTIRParams.visibilityScaleFactor, 0.001f, 1.0f);
+                cgns.tooltip("Distance scale for position compatibility: s = factor * queryDist.", true);
+
+                dirty |= cgns.var("Position Beta", mReSTIRParams.positionBeta, 0.0f, 8.0f);
+                cgns.tooltip("Exponent on the position compatibility score.", true);
+
+                dirty |= cgns.var("Normal Beta", mReSTIRParams.normalBeta, 0.0f, 32.0f);
+                cgns.tooltip("Exponent on the normal compatibility score.", true);
+
+                dirty |= cgns.checkbox("Early Stop on High Compatibility", mReSTIRParams.useNeighborRejection);
+                cgns.tooltip("Stop sampling candidates once one scores above the cutoff.", true);
+
+                if (mReSTIRParams.useNeighborRejection)
+                {
+                    dirty |= cgns.var("Early Stop Cutoff", mReSTIRParams.earlyStopCutoff, 0.0f, 1.0f);
+                    cgns.tooltip("Compatibility score threshold for early stopping.", true);
+                }
+            }
         }
     }
 
