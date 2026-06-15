@@ -61,6 +61,7 @@ namespace
 
     // CGNS — Neighbor G-buffer
     const std::string kGenerateCGNSGBufferFile = "RenderPasses/CGNS/GenerateCGNSGBuffer.cs.slang";
+    const std::string kSelectNeighborsFile     = "RenderPasses/CGNS/SelectNeighbors.cs.slang";
 
     // Render pass inputs and outputs.
 
@@ -1057,6 +1058,12 @@ void CGNS::updatePrograms()
         desc.addShaderLibrary(kGenerateCGNSGBufferFile).csEntry("main");
         mpGenerateCGNSGBufferPass = ComputePass::create(mpDevice, desc, defines, false);
     }
+    if (!mpSelectNeighborsPass)
+    {
+        ProgramDesc desc = baseDesc;
+        desc.addShaderLibrary(kSelectNeighborsFile).csEntry("main");
+        mpSelectNeighborsPass = ComputePass::create(mpDevice, desc, defines, false);
+    }
 
     auto preparePass = [&](ref<ComputePass> pass)
     {
@@ -1076,6 +1083,7 @@ void CGNS::updatePrograms()
     preparePass(mpResolveReSTIRPass);
     preparePass(mpReflectTypes);
     preparePass(mpGenerateCGNSGBufferPass);
+    preparePass(mpSelectNeighborsPass);
 
     mVarsChanged = true;
     mRecompile = false;
@@ -1372,6 +1380,28 @@ void CGNS::prepareResources(RenderContext* pRenderContext, const RenderData& ren
     else
     {
         mpCgnsGBuffer = nullptr;
+    }
+
+    // CGNS — neighbor selection buffer: one int2 per pixel.
+    if (mReSTIRParams.enableSpatialResampling)
+    {
+        uint32_t pixelCount = mParams.frameDim.x * mParams.frameDim.y;
+        if (!mpNeighborSelections || mpNeighborSelections->getElementCount() != pixelCount)
+        {
+            auto reflVar = mpReflectTypes->getRootVar()["neighborSelections"];
+            mpNeighborSelections = mpDevice->createStructuredBuffer(
+                reflVar,
+                pixelCount,
+                ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess,
+                MemoryType::DeviceLocal,
+                nullptr,
+                false
+            );
+        }
+    }
+    else
+    {
+        mpNeighborSelections = nullptr;
     }
 }
 
@@ -2037,6 +2067,29 @@ void CGNS::generateCGNSGBuffer(RenderContext* pRenderContext, const RenderData& 
     mpGenerateCGNSGBufferPass->execute(pRenderContext, {mParams.frameDim.x, mParams.frameDim.y, 1});
 }
 
+void CGNS::selectNeighbors(RenderContext* pRenderContext, const RenderData& renderData, uint32_t iteration)
+{
+    FALCOR_PROFILE(pRenderContext, "selectNeighbors");
+
+    auto rootVar = mpSelectNeighborsPass->getRootVar();
+    mpScene->bindShaderData(rootVar["gScene"]);
+    auto var = rootVar["CB"]["gSelectNeighbors"];
+    var["params"].setBlob(mParams);
+    var["cgnsGBuffer"]             = mpCgnsGBuffer;
+    var["neighborOffsets"]         = mpNeighborOffsets;
+    var["neighborSelections"]      = mpNeighborSelections;
+    var["gSpatialRoundId"]         = (int)iteration;
+    var["gNeighborCandidateCount"] = (int)mReSTIRParams.neighborCandidateCount;
+    var["gGatherRadius"]           = mReSTIRParams.spatialGatherRadius;
+    var["gVisibilityScaleFactor"]  = mReSTIRParams.visibilityScaleFactor;
+    var["gPositionBeta"]           = mReSTIRParams.positionBeta;
+    var["gNormalBeta"]             = mReSTIRParams.normalBeta;
+    var["gUseNeighborRejection"]   = mReSTIRParams.useNeighborRejection;
+    var["gEarlyStopCutoff"]        = mReSTIRParams.earlyStopCutoff;
+
+    mpSelectNeighborsPass->execute(pRenderContext, {mParams.frameDim.x, mParams.frameDim.y, 1});
+}
+
 void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
     generateCGNSGBuffer(pRenderContext, renderData);
@@ -2062,6 +2115,8 @@ void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& re
         var["prevReconnectionData"] = pSwapReconnectionData;
         var["currReconnectionData"] = mpCurrReconnectionData;
         var["vbuffer"] = renderData.getTexture(kInputVBuffer);
+
+        selectNeighbors(pRenderContext, renderData, i);
 
         tracePass(pRenderContext, renderData, *mpSpatialResamplingPass);
     }
@@ -2105,6 +2160,7 @@ DefineList CGNS::StaticParams::getDefines(const CGNS& owner) const
     defines.add("MIS_HEURISTIC", std::to_string((uint32_t)misHeuristic));
     defines.add("MIS_POWER_EXPONENT", std::to_string(misPowerExponent));
     defines.add("SPATIAL_SAMPLE_COUNT", std::to_string(kSpatialNeighborSamples));
+    defines.add("WRS_ALGORITHM", "0"); // 0 = WRS_ALG_ACHAO (A-Chao, M=1)
 
     // Sampling utilities configuration.
     FALCOR_ASSERT(owner.mpSampleGenerator);

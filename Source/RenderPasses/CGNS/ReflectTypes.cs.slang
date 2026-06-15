@@ -48,5 +48,6 @@ StructuredBuffer<ShiftedPathData> shiftedPaths;
 
 StructuredBuffer<uint> buffer1D;
 StructuredBuffer<uint2> buffer2D;
+StructuredBuffer<int2> neighborSelections;
 
 void main() {}

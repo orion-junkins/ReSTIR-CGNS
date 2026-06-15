@@ -42,7 +42,9 @@ target_sources(CGNS PRIVATE
     VisualizeForwardReprojection.cs.slang
     # CGNS - Compatibility-Guided Neighbor Selection
     CGNSUtils.slang
+    WRSReservoir.slang
     GenerateCGNSGBuffer.cs.slang
+    SelectNeighbors.cs.slang
 )
 
 target_copy_shaders(CGNS RenderPasses/CGNS)

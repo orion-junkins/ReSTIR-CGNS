@@ -181,6 +181,14 @@ private:
         float spatialGatherRadius = 30.0f;                                      ///< Radius for spatial reuse.
         uint32_t neighborCount = 1;                                             ///< Number of neighbors to consider for spatial resampling (for a given iteration).
         bool useConfidenceWeightsSpatially = true;                              ///< Toggle for using confidence weights during spatial resampling.
+
+        // CGNS — neighbor pre-selection
+        uint32_t neighborCandidateCount = 32;       ///< K: number of candidates scored per pixel per iteration.
+        float    visibilityScaleFactor = 0.1261f;   ///< s = visibilityScaleFactor * queryDist  (≈√(0.05/π))
+        float    positionBeta = 1.0f;               ///< Exponent on the position compatibility score.
+        float    normalBeta = 8.0f;                 ///< Exponent on the normal compatibility score.
+        bool     useNeighborRejection = true;       ///< Stop sampling early when a candidate scores ≥ earlyStopCutoff.
+        float    earlyStopCutoff = 0.9f;            ///< Score threshold for early stopping.
     };
 
     // Configuration
@@ -277,6 +285,12 @@ private:
     ref<ComputePass>                mpGenerateCGNSGBufferPass;
 
     void generateCGNSGBuffer(RenderContext* pRenderContext, const RenderData& renderData);
+
+    // CGNS — Pre-selected neighbor indices (one int2 per pixel, updated each spatial iteration)
+    ref<Buffer>                     mpNeighborSelections;         ///< StructuredBuffer<int2>: selected neighbor pixel per pixel.
+    ref<ComputePass>                mpSelectNeighborsPass;
+
+    void selectNeighbors(RenderContext* pRenderContext, const RenderData& renderData, uint32_t iteration);
 
     // When the scene is frozen, we want to preserve the previous reservoirs and reconnection data,
     // so during the spatial pass, we overwrite temporary buffers instead.
