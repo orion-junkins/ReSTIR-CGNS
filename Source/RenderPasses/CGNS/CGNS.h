@@ -272,6 +272,12 @@ private:
     // Spatial resampling
     ref<Texture>                    mpNeighborOffsets;                      ///< Quasi-random numbers to sample neighbor reservoirs.
 
+    // CGNS — Neighbor G-buffer (written once per frame before the spatial iteration loop)
+    ref<Texture>                    mpCgnsGBuffer;                ///< RGBA16F: (world normal xyz, camera-to-surface distance). dist==0 → env hit.
+    ref<ComputePass>                mpGenerateCGNSGBufferPass;
+
+    void generateCGNSGBuffer(RenderContext* pRenderContext, const RenderData& renderData);
+
     // When the scene is frozen, we want to preserve the previous reservoirs and reconnection data,
     // so during the spatial pass, we overwrite temporary buffers instead.
     ref<Buffer>                     mpTempReservoirs;

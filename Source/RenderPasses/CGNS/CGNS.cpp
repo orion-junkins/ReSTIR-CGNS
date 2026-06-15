@@ -59,6 +59,9 @@ namespace
     // Visualization Utility
     const std::string kVisualizeForwardReprojectionFile = "RenderPasses/CGNS/VisualizeForwardReprojection.cs.slang";
 
+    // CGNS — Neighbor G-buffer
+    const std::string kGenerateCGNSGBufferFile = "RenderPasses/CGNS/GenerateCGNSGBuffer.cs.slang";
+
     // Render pass inputs and outputs.
 
     const std::string kInputVBuffer = "vbuffer";
@@ -1047,6 +1050,14 @@ void CGNS::updatePrograms()
         mpReflectTypes = ComputePass::create(mpDevice, desc, defines, false);
     }
 
+    // CGNS passes
+    if (!mpGenerateCGNSGBufferPass)
+    {
+        ProgramDesc desc = baseDesc;
+        desc.addShaderLibrary(kGenerateCGNSGBufferFile).csEntry("main");
+        mpGenerateCGNSGBufferPass = ComputePass::create(mpDevice, desc, defines, false);
+    }
+
     auto preparePass = [&](ref<ComputePass> pass)
     {
         // Note that we must use set instead of add defines to replace any stale state.
@@ -1064,6 +1075,7 @@ void CGNS::updatePrograms()
     preparePass(mpVisualizeForwardReprojectionPass);
     preparePass(mpResolveReSTIRPass);
     preparePass(mpReflectTypes);
+    preparePass(mpGenerateCGNSGBufferPass);
 
     mVarsChanged = true;
     mRecompile = false;
@@ -1339,6 +1351,27 @@ void CGNS::prepareResources(RenderContext* pRenderContext, const RenderData& ren
     if (!mpNeighborOffsets)
     {
         mpNeighborOffsets = createNeighborOffsetTexture(kSpatialNeighborSamples);
+    }
+
+    // CGNS G-buffer: one RGBA16F texel per pixel, (world normal xyz, cam-dist).
+    if (mReSTIRParams.enableSpatialResampling)
+    {
+        if (!mpCgnsGBuffer ||
+            mpCgnsGBuffer->getWidth()  != mParams.frameDim.x ||
+            mpCgnsGBuffer->getHeight() != mParams.frameDim.y)
+        {
+            mpCgnsGBuffer = mpDevice->createTexture2D(
+                mParams.frameDim.x,
+                mParams.frameDim.y,
+                ResourceFormat::RGBA16Float,
+                1, 1, nullptr,
+                ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess
+            );
+        }
+    }
+    else
+    {
+        mpCgnsGBuffer = nullptr;
     }
 }
 
@@ -1991,8 +2024,23 @@ void CGNS::scatterBackupTemporalResampling(RenderContext* pRenderContext, const 
     tracePass(pRenderContext, renderData, *mpScatterBackupTemporalResamplingPass);
 }
 
+void CGNS::generateCGNSGBuffer(RenderContext* pRenderContext, const RenderData& renderData)
+{
+    FALCOR_PROFILE(pRenderContext, "generateCGNSGBuffer");
+
+    auto rootVar = mpGenerateCGNSGBufferPass->getRootVar();
+    mpScene->bindShaderData(rootVar["gScene"]);
+    auto var = rootVar["CB"]["gGenerateCGNSGBuffer"];
+    var["params"].setBlob(mParams);
+    var["vbuffer"]               = renderData.getTexture(kInputVBuffer);
+    var["cgnsGBuffer"]           = mpCgnsGBuffer;
+    mpGenerateCGNSGBufferPass->execute(pRenderContext, {mParams.frameDim.x, mParams.frameDim.y, 1});
+}
+
 void CGNS::spatialResampling(RenderContext* pRenderContext, const RenderData& renderData)
 {
+    generateCGNSGBuffer(pRenderContext, renderData);
+
     auto var = mpSpatialResamplingPass->pVars->getRootVar()["CB"]["gSpatialResampling"];
     var["params"].setBlob(mParams);
     var["useConfidenceWeights"] = mReSTIRParams.useConfidenceWeightsSpatially;
