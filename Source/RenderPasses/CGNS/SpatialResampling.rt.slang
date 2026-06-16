@@ -117,8 +117,8 @@ struct SpatialResampling
             // Lens vertex copy or primary hit reconnection, depending on which index we're at.
             bool lensVertexCopyShift = (i < numLensVertexCopyShifts);
 
-            // Get the CGNS pre-selected neighbor pixel.
-            int2 neighborPixel = neighborSelections[reservoirIdx];
+            // Get the CGNS pre-selected neighbor pixel (stride = neighborCount, slot i).
+            int2 neighborPixel = neighborSelections[reservoirIdx * neighborCount + i];
             if (!params.validateIntegerPixelBounds(neighborPixel)) continue;
 
             // Geometry rejection: discard neighbors with incompatible normals or depths.

@@ -24,7 +24,9 @@ struct SelectNeighbors
     RWStructuredBuffer<int2> neighborSelections;///< Output: one selected pixel per pixel
 
     int   gSpatialRoundId;
-    int   gNeighborCandidateCount;   ///< K — candidates sampled
+    int   gNeighborCandidateCount;   ///< K — candidates scored per pixel
+    int   gM;                        ///< M — selections to keep (1 → A-Chao, >1 → A-ES)
+    uint  gStride;                   ///< Elements per pixel in neighborSelections (== M)
     float gGatherRadius;
 
     float gScaleSolidAngle;    ///< Ω (sr); controls position falloff radius via s = sqrt(Ω/π) * queryDist
@@ -76,26 +78,51 @@ struct SelectNeighbors
         float3 queryPos  = queryValid ? computeWorldPos(int2(pixel), queryDist) : float3(0, 0, 0);
 
         uint startIndex = uint(sampleNext1D(sg) * kSpatialNeighborSamples);
+        uint base       = centralOffset * gStride;
 
-#if WRS_ALGORITHM == WRS_ALG_ACHAO
-        AChaoReservoir res;
-        res.init(int2(pixel));
-
-        for (int k = 0; k < gNeighborCandidateCount; k++)
+        if (gM == 1)
         {
-            int2 candidate = int2(round(float2(pixel)
-                + gGatherRadius * neighborOffsets[(startIndex + uint(k)) % kSpatialNeighborSamples]));
-            if (!params.validateIntegerPixelBounds(candidate)) continue;
+            // A-Chao: O(1) memory, unbiased for M=1.
+            AChaoReservoir res;
+            res.init(int2(pixel));
 
-            float score = scoreCandidate(queryValid, queryPos, queryNorm, queryDist, candidate);
-            float u     = sampleNext1D(sg);
-            res.tryUpdate(candidate, score, u);
+            for (int k = 0; k < gNeighborCandidateCount; k++)
+            {
+                int2 candidate = int2(round(float2(pixel)
+                    + gGatherRadius * neighborOffsets[(startIndex + uint(k)) % kSpatialNeighborSamples]));
+                if (!params.validateIntegerPixelBounds(candidate)) continue;
 
-            if (gUseNeighborRejection && score >= gEarlyStopCutoff) break;
+                float score = scoreCandidate(queryValid, queryPos, queryNorm, queryDist, candidate);
+                float u     = sampleNext1D(sg);
+                res.tryUpdate(candidate, score, u);
+
+                if (gUseNeighborRejection && score >= gEarlyStopCutoff) break;
+            }
+
+            neighborSelections[base] = res.get();
         }
+        else
+        {
+            // A-ES: key = log(u)/w per candidate, maintain top-M. Unbiased for any M.
+            AESReservoir res;
+            res.init(int2(pixel), uint(gM));
 
-        neighborSelections[centralOffset] = res.get();
-#endif
+            for (int k = 0; k < gNeighborCandidateCount; k++)
+            {
+                int2 candidate = int2(round(float2(pixel)
+                    + gGatherRadius * neighborOffsets[(startIndex + uint(k)) % kSpatialNeighborSamples]));
+                if (!params.validateIntegerPixelBounds(candidate)) continue;
+
+                float score = scoreCandidate(queryValid, queryPos, queryNorm, queryDist, candidate);
+                float u     = sampleNext1D(sg);
+                res.tryUpdate(candidate, score, u, uint(gM));
+
+                if (gUseNeighborRejection && score >= gEarlyStopCutoff) break;
+            }
+
+            for (uint j = 0; j < uint(gM); j++)
+                neighborSelections[base + j] = res.get(j);
+        }
     }
 }
 

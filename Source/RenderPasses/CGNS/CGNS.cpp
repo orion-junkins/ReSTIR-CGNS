@@ -63,6 +63,9 @@ namespace
     const std::string kGenerateCGNSGBufferFile = "RenderPasses/CGNS/GenerateCGNSGBuffer.cs.slang";
     const std::string kSelectNeighborsFile     = "RenderPasses/CGNS/SelectNeighbors.cs.slang";
 
+    // Must match kWRSMaxCapacity in WRSReservoir.slang.
+    constexpr uint32_t kWRSMaxCapacity = 5;
+
     // Render pass inputs and outputs.
 
     const std::string kInputVBuffer = "vbuffer";
@@ -642,8 +645,8 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
             dirty |= spatial.var("Spatial Gather Radius", mReSTIRParams.spatialGatherRadius);
             spatial.tooltip("Radius of disk for candidate spatial samples", true);
 
-            dirty |= spatial.var("Spatial Neighbor Samples", mReSTIRParams.neighborCount);
-            spatial.tooltip("Number of spatial neighbors to resample per iteration.", true);
+            dirty |= spatial.var("Spatial Neighbor Samples (M)", mReSTIRParams.neighborCount, 1u, (uint32_t)kWRSMaxCapacity);
+            spatial.tooltip("M=1 uses A-Chao WRS; M>1 switches to A-ES (max 5).", true);
 
             dirty |= spatial.checkbox("Enable Confidence Weights Spatially", mReSTIRParams.useConfidenceWeightsSpatially);
             spatial.tooltip("Use confidence weights during spatial resampling.", true);
@@ -1407,12 +1410,13 @@ void CGNS::prepareResources(RenderContext* pRenderContext, const RenderData& ren
     if (mReSTIRParams.enableSpatialResampling)
     {
         uint32_t pixelCount = mParams.frameDim.x * mParams.frameDim.y;
-        if (!mpNeighborSelections || mpNeighborSelections->getElementCount() != pixelCount)
+        uint32_t selectionCount = pixelCount * mReSTIRParams.neighborCount;
+        if (!mpNeighborSelections || mpNeighborSelections->getElementCount() != selectionCount)
         {
             auto reflVar = mpReflectTypes->getRootVar()["neighborSelections"];
             mpNeighborSelections = mpDevice->createStructuredBuffer(
                 reflVar,
-                pixelCount,
+                selectionCount,
                 ResourceBindFlags::ShaderResource | ResourceBindFlags::UnorderedAccess,
                 MemoryType::DeviceLocal,
                 nullptr,
@@ -2101,6 +2105,8 @@ void CGNS::selectNeighbors(RenderContext* pRenderContext, const RenderData& rend
     var["neighborSelections"]      = mpNeighborSelections;
     var["gSpatialRoundId"]         = (int)iteration;
     var["gNeighborCandidateCount"] = (int)mReSTIRParams.neighborCandidateCount;
+    var["gM"]                      = (int)mReSTIRParams.neighborCount;
+    var["gStride"]                 = (uint32_t)mReSTIRParams.neighborCount;
     var["gGatherRadius"]           = mReSTIRParams.spatialGatherRadius;
     var["gScaleSolidAngle"]        = mReSTIRParams.scaleSolidAngle;
     var["gUseNeighborRejection"]   = mReSTIRParams.useNeighborRejection;
@@ -2180,7 +2186,6 @@ DefineList CGNS::StaticParams::getDefines(const CGNS& owner) const
     defines.add("MIS_HEURISTIC", std::to_string((uint32_t)misHeuristic));
     defines.add("MIS_POWER_EXPONENT", std::to_string(misPowerExponent));
     defines.add("SPATIAL_SAMPLE_COUNT", std::to_string(kSpatialNeighborSamples));
-    defines.add("WRS_ALGORITHM", "0"); // 0 = WRS_ALG_ACHAO (A-Chao, M=1)
 
     // Sampling utilities configuration.
     FALCOR_ASSERT(owner.mpSampleGenerator);

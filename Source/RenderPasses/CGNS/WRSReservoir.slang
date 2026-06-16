@@ -13,6 +13,10 @@
 #define WRS_ALG_ACHAO 0
 #define WRS_ALG_AES   1
 
+/// Stride used when writing/reading the neighborSelections buffer.
+/// Always kWRSMaxCapacity regardless of active M, so the layout is stable.
+static const uint kWRSMaxCapacity = 5;
+
 #ifndef EPSILON
 #define EPSILON 1e-25f
 #endif
