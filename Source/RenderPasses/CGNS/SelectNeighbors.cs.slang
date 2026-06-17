@@ -30,6 +30,7 @@ struct SelectNeighbors
     float gGatherRadius;
 
     float gScaleSolidAngle;    ///< Ω (sr); controls position falloff radius via s = sqrt(Ω/π) * queryDist
+    float gNormalBeta;         ///< β: exponent on max(n·n', 0)
 
     bool  gUseNeighborRejection;
     float gEarlyStopCutoff;
@@ -58,7 +59,7 @@ struct SelectNeighbors
             queryValid, candidateValid,
             queryPos, queryNormal, queryDist,
             candidatePos, candidateNorm, candidateDist,
-            gScaleSolidAngle
+            gScaleSolidAngle, gNormalBeta
         );
     }
 

@@ -662,6 +662,9 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
                 dirty |= cgns.var("Scale Solid Angle (s)", mReSTIRParams.scaleSolidAngle, 0.001f, 1.0f);
                 cgns.tooltip("Solid angle (sr) of the characteristic search disk: s = sqrt(Omega/pi) * depth.", true);
 
+                dirty |= cgns.var("Normal Beta", mReSTIRParams.normalBeta, 0.0f, 32.0f);
+                cgns.tooltip("Exponent beta on the normal compatibility term max(n.n', 0)^beta.", true);
+
                 dirty |= cgns.checkbox("Early Stop on High Compatibility", mReSTIRParams.useNeighborRejection);
                 cgns.tooltip("Stop sampling candidates once one scores above the cutoff.", true);
 
@@ -2109,6 +2112,7 @@ void CGNS::selectNeighbors(RenderContext* pRenderContext, const RenderData& rend
     var["gStride"]                 = (uint32_t)mReSTIRParams.neighborCount;
     var["gGatherRadius"]           = mReSTIRParams.spatialGatherRadius;
     var["gScaleSolidAngle"]        = mReSTIRParams.scaleSolidAngle;
+    var["gNormalBeta"]             = mReSTIRParams.normalBeta;
     var["gUseNeighborRejection"]   = mReSTIRParams.useNeighborRejection;
     var["gEarlyStopCutoff"]        = mReSTIRParams.earlyStopCutoff;
 

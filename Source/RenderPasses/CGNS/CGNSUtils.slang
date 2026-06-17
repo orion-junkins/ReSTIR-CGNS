@@ -3,11 +3,10 @@
  * Used by SelectNeighbors.cs.slang to score candidate pixels before WRS selection.
  *
  * Heuristic: h = h_position * h_normal  (paper §4.3)
- *   h_position = exp(-||x - y|| / s),   s = sqrt(Ω/π) * queryDist
- *   h_normal   = max(n_x · n_y, 0)
+ *   h_position = exp(-||x - y|| / s),      s = sqrt(Ω/π) * queryDist
+ *   h_normal   = max(n_x · n_y, 0)^β
  *
- * Ω (scaleSolidAngle, steradians) is the only tunable parameter.
- * Paper default: Ω = 0.05 sr.
+ * Paper defaults: Ω = 0.05 sr, β = 8.
  */
 
 #ifndef EPSILON
@@ -25,7 +24,8 @@ float computeNeighborWeight(
     float3 candidatePos,
     float3 candidateNormal,
     float  candidateDist,
-    float  gScaleSolidAngle   ///< Ω in steradians; s = sqrt(Ω/π) * queryDist
+    float  gScaleSolidAngle,  ///< Ω in steradians; s = sqrt(Ω/π) * queryDist
+    float  gNormalBeta        ///< β: exponent on the normal compatibility term
 )
 {
     if (!queryValid && !candidateValid)
@@ -34,10 +34,10 @@ float computeNeighborWeight(
     if (!queryValid || !candidateValid)
         return EPSILON; // one surface, one env — discourage
 
-    // s = sqrt(Ω/π) * d  (characteristic world-space radius at depth d, see Paper section 4.3)
+    // s = sqrt(Ω/π) * d  (characteristic world-space radius at depth d, paper §4.3)
     float scale         = max(EPSILON, sqrt(gScaleSolidAngle / kPi) * queryDist);
     float positionScore = exp(-distance(queryPos, candidatePos) / scale);
     float normalScore   = max(0.0f, dot(queryNormal, candidateNormal));
 
-    return clamp(positionScore * normalScore, EPSILON, 1.0f);
+    return clamp(positionScore * pow(normalScore, gNormalBeta), EPSILON, 1.0f);
 }

@@ -186,8 +186,9 @@ private:
         // CGNS — neighbor pre-selection
         uint32_t neighborCandidateCount = 32;       ///< K: number of candidates scored per pixel per iteration.
         float    scaleSolidAngle = 0.05f;           ///< Ω (sr): solid angle of the characteristic search disk; s = sqrt(Ω/π) * queryDist.
+        float    normalBeta = 8.0f;                 ///< β: exponent on the normal compatibility term max(n·n', 0)^β.
         bool     useNeighborRejection = true;       ///< Stop sampling early when a candidate scores ≥ earlyStopCutoff.
-        float    earlyStopCutoff = 0.9f;            ///< Score threshold for early stopping.
+        float    earlyStopCutoff = 0.5f;            ///< Score threshold for early stopping.
     };
 
     // Configuration
