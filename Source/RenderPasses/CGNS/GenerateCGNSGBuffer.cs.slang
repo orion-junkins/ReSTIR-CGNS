@@ -3,8 +3,8 @@
  * Reads the V-buffer and writes (world normal xyz, camera-to-surface distance) into
  * an RGBA16F texture consumed by SelectNeighbors.cs.slang.
  *
- * dist == 0 encodes an environment/invalid hit — SelectNeighbors and
- * CGNSUtils rely on this sentinel to detect the env-hit case.
+ * dist == 0 encodes an environment/invalid hit - SelectNeighbors uses
+ * this sentinel to determine candidateValid.
  */
 
 import Scene.Scene;
@@ -17,7 +17,7 @@ struct GenerateCGNSGBuffer
     PathTracerParams params;
 
     Texture2D<PackedHitInfo> vbuffer;
-    RWTexture2D<float4>      cgnsGBuffer;  ///< Output: (world normal xyz, cam-dist)
+    RWTexture2D<float4>      cgnsGBuffer;  // Output: (world normal xyz, cam-dist)
 
     void execute(const uint2 pixel)
     {
@@ -27,7 +27,7 @@ struct GenerateCGNSGBuffer
 
         if (!hit.isValid())
         {
-            cgnsGBuffer[pixel] = float4(0, 0, 0, 0);  // dist == 0 → env hit
+            cgnsGBuffer[pixel] = float4(0, 0, 0, 0);  // dist == 0 -> env hit
             return;
         }
 
