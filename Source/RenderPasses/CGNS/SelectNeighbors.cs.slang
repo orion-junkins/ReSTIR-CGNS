@@ -108,21 +108,27 @@ struct SelectNeighbors
             AESReservoir res;
             res.init(int2(pixel), uint(gM));
 
+            int highQualityCount = 0;
             for (int k = 0; k < gNeighborCandidateCount; k++)
             {
                 int2 candidate = int2(round(float2(pixel)
                     + gGatherRadius * neighborOffsets[(startIndex + uint(k)) % kSpatialNeighborSamples]));
                 if (!params.validateIntegerPixelBounds(candidate)) continue;
 
-                float score = scoreCandidate(queryValid, queryPos, queryNorm, queryDist, candidate);
+                float score = scoreCandidate(queryValid, queryPos, queryNormal, queryScale, candidate);
                 float u     = sampleNext1D(sg);
                 res.tryUpdate(candidate, score, u, uint(gM));
 
-                if (gUseNeighborRejection && score >= gEarlyStopCutoff) break;
+                if (gUseEarlyStopping && score >= gEarlyStopCutoff)
+                {
+                    if (++highQualityCount >= gM) break;
+                }
             }
 
             for (uint j = 0; j < uint(gM); j++)
+            {
                 neighborSelections[base + j] = res.get(j);
+            }
         }
     }
 }
