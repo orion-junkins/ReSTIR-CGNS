@@ -1119,24 +1119,36 @@ ref<Texture> CGNS::createNeighborOffsetTexture(const uint32_t sampleCount)
 {
     std::unique_ptr<int8_t[]> offsets(new int8_t[sampleCount * 2]);
     const int R = 254;
+    // R2 sequence: increments are 1/ρ and 1/ρ² where ρ ≈ 1.3247 is the plastic constant [Roberts 2018].
     const float phi2 = 1.f / 1.3247179572447f;
     float u = 0.5f;
     float v = 0.5f;
-    for (uint32_t index = 0; index < sampleCount * 2;)
+
+    for (uint32_t i = 0; i < sampleCount; i++)
     {
         u += phi2;
         v += phi2 * phi2;
-        if (u >= 1.f)
-            u -= 1.f;
-        if (v >= 1.f)
-            v -= 1.f;
+        if (u >= 1.f) u -= 1.f;
+        if (v >= 1.f) v -= 1.f;
 
-        float rSq = (u - 0.5f) * (u - 0.5f) + (v - 0.5f) * (v - 0.5f);
-        if (rSq > 0.25f)
-            continue;
+        // Map R2 sample in [0,1]² to [-1,1]², then apply Shirley-Chiu concentric disk mapping [Shirley & Chiu 1997].
+        float a = 2.0f * u - 1.0f;
+        float b = 2.0f * v - 1.0f;
 
-        offsets[index++] = int8_t((u - 0.5f) * R);
-        offsets[index++] = int8_t((v - 0.5f) * R);
+        float r, phi;
+        if (std::abs(a) > std::abs(b))
+        {
+            r   = a;
+            phi = (a != 0.0f) ? (float(M_PI) / 4.0f) * (b / a) : 0.0f;
+        }
+        else
+        {
+            r   = b;
+            phi = (b != 0.0f) ? (float(M_PI) / 2.0f) - (float(M_PI) / 4.0f) * (a / b) : 0.0f;
+        }
+
+        offsets[i * 2 + 0] = int8_t(r * std::cos(phi) * R);
+        offsets[i * 2 + 1] = int8_t(r * std::sin(phi) * R);
     }
 
     return mpDevice->createTexture1D(sampleCount, ResourceFormat::RG8Snorm, 1, 1, offsets.get());

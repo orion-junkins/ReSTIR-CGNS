@@ -49,6 +49,8 @@ This code directly builds on the following prior work:
 - **Keller et al. 2016** — Path Space Filtering. *Monte Carlo and Quasi-Monte Carlo Methods*, SPMS 163, pp. 423–436. [doi:10.1007/978-3-319-33507-0_21](https://doi.org/10.1007/978-3-319-33507-0_21)
 - **Lin et al. 2022** — Generalized Resampled Importance Sampling: Foundations of ReSTIR. *SIGGRAPH 2022*. [doi:10.1145/3528223.3530158](https://doi.org/10.1145/3528223.3530158)
 - **Liu et al. 2025** — Reservoir Splatting for Temporal Path Resampling and Motion Blur. *SIGGRAPH 2025*. [doi:10.1145/3721238.3730646](https://doi.org/10.1145/3721238.3730646) [[Code]](https://github.com/Jebbly/Reservoir-Splatting)
+- **Roberts 2018** — The Unreasonable Effectiveness of Quasirandom Sequences. [extremelearning.com.au](https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/)
+- **Shirley & Chiu 1997** — A Low Distortion Map Between Disk and Square. *Journal of Graphics Tools* 2(3):45–52. [doi:10.1080/10867651.1997.10487479](https://doi.org/10.1080/10867651.1997.10487479)
 - **Zhang et al. 2024** — Area ReSTIR: Resampling for Real-Time Defocus and Antialiasing. *SIGGRAPH 2024*. [doi:10.1145/3658210](https://doi.org/10.1145/3658210)
 
 See the full references list in the paper for all related work.
