@@ -32,7 +32,8 @@ struct GenerateCGNSGBuffer
         }
 
         float3 cameraPos = gScene.camera.getPosition();
-        ShadingData sd   = loadShadingData(hit, cameraPos, float3(0, 0, 1));
+        float3 rayDir    = normalize(gScene.camera.computeNonNormalizedRayDirPinhole(pixel, params.frameDim));
+        ShadingData sd   = loadShadingData(hit, cameraPos, rayDir);
         float posDist    = distance(cameraPos, sd.posW);
 
         cgnsGBuffer[pixel] = float4(sd.frame.N, posDist);
