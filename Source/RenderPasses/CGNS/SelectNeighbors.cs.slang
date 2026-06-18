@@ -1,12 +1,13 @@
 /**
- * Pre-selects M=1 neighbor pixel per pixel for spatial resampling.
+ * Pre-selects M neighbors per pixel for spatial resampling.
  *
- * Samples K candidates from the R2 quasi-random disk, scores each using
- * the CGNS compatibility heuristic (CGNSUtils.slang), and selects one
- * via A-Chao weighted reservoir sampling.
+ * Directly implements Algorithm 1 (paper §5).
  *
- * Output: neighborSelections[linearizePixel(px)] = selected int2 pixel.
- * The RT pass still picks neighbors randomly until Commit 4 wires this up.
+ * Samples K candidates from the precomputed R2 quasi-random disk.
+ * Scores each using the CGNS compatibility heuristic (CGNSUtils.slang).
+ * Selects M via weighted reservoir sampling (WRSReservoir.slang).
+ *
+ * Output: neighborSelections[linearizePixel(px) * M + i] = selected int2 neighbors for pixel i.
  */
 
 import Scene.Scene;
@@ -19,21 +20,20 @@ struct SelectNeighbors
 {
     PathTracerParams params;
 
-    Texture2D<float4>        cgnsGBuffer;       ///< (world normal xyz, cam-dist); dist==0 → env hit
-    Texture1D<float2>        neighborOffsets;   ///< R2 quasi-random disk offsets
-    RWStructuredBuffer<int2> neighborSelections;///< Output: one selected pixel per pixel
+    Texture2D<float4>        cgnsGBuffer;           // (world normal xyz, cam-dist); dist==0 -> env hit
+    Texture1D<float2>        neighborOffsets;       // R2 quasi-random disk offsets
+    RWStructuredBuffer<int2> neighborSelections;    // Output: M selected pixels per pixel (stride = gM)
 
-    int   gSpatialRoundId;
-    int   gNeighborCandidateCount;   ///< K — candidates scored per pixel
-    int   gM;                        ///< M — selections to keep (1 → A-Chao, >1 → A-ES)
-    uint  gStride;                   ///< Elements per pixel in neighborSelections (== M)
-    float gGatherRadius;
+    float gGatherRadius;             // Radius for sampling neighbors 
+    int   gM;                        // M - selections to return (1 -> A-Chao, >1 -> A-ES)
+    int   gNeighborCandidateCount;   // K — candidates scored per pixel
+    int   gSpatialRoundId;           // Current reuse round if multiple are enabled
 
-    float gScaleSolidAngle;    ///< Ω (sr); controls position falloff radius via s = sqrt(Ω/π) * queryDist
-    float gNormalBeta;         ///< β: exponent on max(n·n', 0)
+    float gScaleSolidAngle;    // Ω (sr); controls position falloff radius via s = sqrt(Ω/π) * queryDist
+    float gNormalBeta;         // β: exponent on max(n·n', 0)
 
-    bool  gUseNeighborRejection;
-    float gEarlyStopCutoff;
+    bool gUseEarlyStopping;     // Stop candidate sampling once M candidates with score >= gEarlyStopCutoff are found (paper §5, §7.5)
+    float gEarlyStopCutoff;     // Determines threshold for early stopping
 
     float3 computeWorldPos(int2 px, float dist)
     {
@@ -45,21 +45,21 @@ struct SelectNeighbors
         bool   queryValid,
         float3 queryPos,
         float3 queryNormal,
-        float  queryDist,
+        float  queryScale,
         int2   candidatePx
     ) {
-        float4 buf            = cgnsGBuffer[candidatePx];
-        float3 candidateNorm  = buf.xyz;
-        float  candidateDist  = buf.w;
-        bool   candidateValid = candidateDist > 0.0f;
-        float3 candidatePos   = candidateValid
+        float4 buf              = cgnsGBuffer[candidatePx];
+        float3 candidateNormal  = buf.xyz;
+        float  candidateDist    = buf.w;
+        bool   candidateValid   = candidateDist > 0.0f;
+        float3 candidatePos     = candidateValid
             ? computeWorldPos(candidatePx, candidateDist) : float3(0, 0, 0);
 
         return computeNeighborWeight(
             queryValid, candidateValid,
-            queryPos, queryNormal, queryDist,
-            candidatePos, candidateNorm, candidateDist,
-            gScaleSolidAngle, gNormalBeta
+            queryPos, queryNormal,
+            candidatePos, candidateNormal,
+            queryScale, gNormalBeta
         );
     }
 
@@ -68,22 +68,23 @@ struct SelectNeighbors
         if (any(pixel >= params.frameDim)) return;
         uint centralOffset = params.linearizePixel(pixel);
 
-        uint seed = kNumRenderPasses * (params.frameCount + params.seed)
-                  + 1337u * uint(gSpatialRoundId) + 42u;
+        // Basic random seed, unique from other passes
+        uint seed = (params.useFixedSeed > 0) ? params.fixedSeed + 4 : kNumRenderPasses * (params.frameCount + params.seed) + 1337 * uint(gSpatialRoundId) + 4;
         var sg = TinyUniformSampleGenerator(pixel, seed);
 
-        float4 qBuf      = cgnsGBuffer[pixel];
-        float3 queryNorm = qBuf.xyz;
-        float  queryDist = qBuf.w;
-        bool   queryValid = queryDist > 0.0f;
-        float3 queryPos  = queryValid ? computeWorldPos(int2(pixel), queryDist) : float3(0, 0, 0);
+        float4 qBuf         = cgnsGBuffer[pixel];
+        float3 queryNormal  = qBuf.xyz;
+        float  queryDist    = qBuf.w;
+        bool   queryValid   = queryDist > 0.0f;
+        float3 queryPos     = queryValid ? computeWorldPos(int2(pixel), queryDist) : float3(0, 0, 0);
+        float  queryScale   = computeNeighborScale(gScaleSolidAngle, queryDist);
 
         uint startIndex = uint(sampleNext1D(sg) * kSpatialNeighborSamples);
-        uint base       = centralOffset * gStride;
+        uint base       = centralOffset * uint(gM);
 
         if (gM == 1)
         {
-            // A-Chao: O(1) memory, unbiased for M=1.
+            // A-Chao WRS algorithm is simplest for M=1
             AChaoReservoir res;
             res.init(int2(pixel));
 
@@ -93,11 +94,11 @@ struct SelectNeighbors
                     + gGatherRadius * neighborOffsets[(startIndex + uint(k)) % kSpatialNeighborSamples]));
                 if (!params.validateIntegerPixelBounds(candidate)) continue;
 
-                float score = scoreCandidate(queryValid, queryPos, queryNorm, queryDist, candidate);
+                float score = scoreCandidate(queryValid, queryPos, queryNormal, queryScale, candidate);
                 float u     = sampleNext1D(sg);
                 res.tryUpdate(candidate, score, u);
 
-                if (gUseNeighborRejection && score >= gEarlyStopCutoff) break;
+                if (gUseEarlyStopping && score >= gEarlyStopCutoff) break;
             }
 
             neighborSelections[base] = res.get();
