@@ -51,7 +51,7 @@ struct SpatialResampling
     uint32_t neighborCount;
 
     StructuredBuffer<int2> neighborSelections;
-    Texture2D<float4>      cgnsGBuffer;         ///< (world normal xyz, cam-dist); dist==0 → env hit
+    Texture2D<float4>      cgnsGBuffer;         // (world normal xyz, cam-dist); dist==0 => env hit
     bool                   enableGeometryRejection;
 
     StructuredBuffer<ReconnectionData> prevReconnectionData;
@@ -108,7 +108,7 @@ struct SpatialResampling
 
         // Read central G-buffer once for geometry rejection checks.
         float4 centralBuf  = cgnsGBuffer[pixel];
-        float3 centralNorm = centralBuf.xyz;
+        float3 centralNormal = centralBuf.xyz;
         float  centralDist = centralBuf.w;
 
         int validNeighbors = 0;
@@ -117,7 +117,6 @@ struct SpatialResampling
             // Lens vertex copy or primary hit reconnection, depending on which index we're at.
             bool lensVertexCopyShift = (i < numLensVertexCopyShifts);
 
-            // Get the CGNS pre-selected neighbor pixel (stride = neighborCount, slot i).
             int2 neighborPixel = neighborSelections[reservoirIdx * neighborCount + i];
             if (!params.validateIntegerPixelBounds(neighborPixel)) continue;
 
@@ -125,14 +124,14 @@ struct SpatialResampling
             if (enableGeometryRejection)
             {
                 float4 neighborBuf   = cgnsGBuffer[neighborPixel];
-                float3 neighborNorm  = neighborBuf.xyz;
+                float3 neighborNormal  = neighborBuf.xyz;
                 float  neighborDist  = neighborBuf.w;
                 bool   centralSurf   = centralDist  > 0.0f;
                 bool   neighborSurf  = neighborDist > 0.0f;
                 if (centralSurf != neighborSurf) continue; // surface/env mismatch
                 if (centralSurf)
                 {
-                    if (dot(centralNorm, neighborNorm) < 0.5f)                    continue;
+                    if (dot(centralNormal, neighborNormal) < 0.5f)                    continue;
                     if (abs(centralDist - neighborDist) >= 0.1f * centralDist)    continue;
                 }
             }

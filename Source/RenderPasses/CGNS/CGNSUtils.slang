@@ -15,29 +15,33 @@
 
 static const float kPi = 3.14159265f;
 
+// s = sqrt(Ω/π) * d  (characteristic world-space radius at distance d, paper §4.3)
+// Controls position falloff radius ensuring the heuristic is agnostic to scene scale.
+float computeNeighborScale(float solidAngle, float dist)
+{
+    return max(EPSILON, sqrt(solidAngle / kPi) * dist);
+}
+
 float computeNeighborWeight(
     bool   queryValid,
     bool   candidateValid,
     float3 queryPos,
     float3 queryNormal,
-    float  queryDist,
     float3 candidatePos,
     float3 candidateNormal,
-    float  candidateDist,
-    float  gScaleSolidAngle,  ///< Ω in steradians; s = sqrt(Ω/π) * queryDist
-    float  gNormalBeta        ///< β: exponent on the normal compatibility term
+    float  scale,      // s = sqrt(Ω/π) * queryDist
+    float  normalBeta  // β: exponent on the normal compatibility term
 )
 {
+    // Special handling for invalid hits (e.g. environment maps)
     if (!queryValid && !candidateValid)
-        return 1.0f;   // both env hits — encourage reuse
+        return 1.0f;   // both env map hits — encourage reuse
 
     if (!queryValid || !candidateValid)
-        return EPSILON; // one surface, one env — discourage
+        return EPSILON; // one surface, one env map — discourage
 
-    // s = sqrt(Ω/π) * d  (characteristic world-space radius at depth d, paper §4.3)
-    float scale         = max(EPSILON, sqrt(gScaleSolidAngle / kPi) * queryDist);
     float positionScore = exp(-distance(queryPos, candidatePos) / scale);
     float normalScore   = max(0.0f, dot(queryNormal, candidateNormal));
 
-    return clamp(positionScore * pow(normalScore, gNormalBeta), EPSILON, 1.0f);
+    return clamp(positionScore * pow(normalScore, normalBeta), EPSILON, 1.0f);
 }

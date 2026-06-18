@@ -1,37 +1,29 @@
 /**
  * Weighted Reservoir Sampling structs for CGNS neighbor selection.
  *
- * WRS_ALG_ACHAO (0): A-Chao (Efraimidis 2010, Algorithm A-Chao, Sec 3.1) — running weight sum,
- *                    probabilistic accept. Used for M=1. For M>1, overweight items
- *                    (w_i > W_{i-1}) are selected with probability 1, which biases
- *                    the sample when multiple slots must be filled independently.
- * WRS_ALG_AES   (1): A-ES (Efraimidis 2010, Algorithm A-ES, Sec 3.2) — key = log(u)/w per
- *                    candidate, maintain top-M by evicting the minimum-key slot.
- *                    Correct for any M. Fixed array of 5 slots (M = 1..5).
+ * AChaoReservoir: A-Chao [Chao 1982, see Efraimidis 2015] - running weight sum, probabilistic accept. M=1 only.
+ *
+ * AESReservoir: A-ES [Efraimidis & Spirakis 2006, see Efraimidis 2015] - key = log(u)/w per candidate, maintain
+ *  top-M by evicting the minimum-key slot. Correct for any M.
+ *  Implemented with a fixed array of 5 slots (M = 1..5). Increase allocation for M>5.
+ *  Decrease allocation to improve performance for a specific count 2 <= M <= 5.
  */
 
-#define WRS_ALG_ACHAO 0
-#define WRS_ALG_AES   1
-
-/// Stride used when writing/reading the neighborSelections buffer.
-/// Always kWRSMaxCapacity regardless of active M, so the layout is stable.
-static const uint kWRSMaxCapacity = 5;
-
 #ifndef EPSILON
-#define EPSILON 1e-25f
+#define EPSILON 1e-8f
 #endif
 
 // ---------------------------------------------------------------------------
-// A-Chao: probabilistic accept on running weight sum. M=1 only.
+// A-Chao: probabilistic accept on running weight sum.
 // ---------------------------------------------------------------------------
 struct AChaoReservoir
 {
     int2  selected;
     float weightSum;
 
-    [mutating] void init(int2 fallback)
+    [mutating] void init(int2 initialItem)
     {
-        selected  = fallback;
+        selected  = initialItem;
         weightSum = 0.0f;
     }
 
@@ -52,8 +44,8 @@ struct AChaoReservoir
 
 // ---------------------------------------------------------------------------
 // A-ES (Efraimidis-Spirakis): key = log(u)/w, maintain top-M.
-// Fixed capacity of 5 slots (M <= 5). Defined here for future use;
-// only activated when WRS_ALGORITHM == WRS_ALG_AES.
+// Fixed capacity of 5 slots (M <= 5)
+// only activated when M > 1
 // ---------------------------------------------------------------------------
 struct AESReservoir
 {
@@ -62,11 +54,11 @@ struct AESReservoir
     int2  pixels[kMaxCapacity];
     float keys[kMaxCapacity];
 
-    [mutating] void init(int2 fallback, uint M)
+    [mutating] void init(int2 initialItem, uint M)
     {
         for (uint i = 0; i < M; i++)
         {
-            pixels[i] = fallback;
+            pixels[i] = initialItem; // Note: all items default to the initial, K < M leads to duplicates
             keys[i]   = -1e38f;
         }
     }
@@ -77,6 +69,8 @@ struct AESReservoir
         float key    = log(max(u, EPSILON)) / max(score, EPSILON);
         uint  minIdx = 0;
         float minKey = keys[0];
+
+        // Linear probe; can be optimized with a min heap for larger M.
         for (uint i = 1; i < M; i++)
         {
             if (keys[i] < minKey) { minKey = keys[i]; minIdx = i; }
@@ -88,14 +82,6 @@ struct AESReservoir
             return true;
         }
         return false;
-    }
-
-    // Current eviction threshold: lowest key in the reservoir.
-    float getThreshold(uint M)
-    {
-        float t = keys[0];
-        for (uint i = 1; i < M; i++) t = min(t, keys[i]);
-        return t;
     }
 
     int2 get(uint i) { return pixels[i]; }

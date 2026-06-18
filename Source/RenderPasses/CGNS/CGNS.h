@@ -183,11 +183,11 @@ private:
         bool useConfidenceWeightsSpatially = true;                              ///< Toggle for using confidence weights during spatial resampling.
         bool enableGeometryRejection = true;                                    ///< Reject neighbors whose normals or depths diverge too far from the central pixel.
 
-        // CGNS — neighbor pre-selection
+        // CGNS — spatial neighbor selection
         uint32_t neighborCandidateCount = 32;       ///< K: number of candidates scored per pixel per iteration.
         float    scaleSolidAngle = 0.05f;           ///< Ω (sr): solid angle of the characteristic search disk; s = sqrt(Ω/π) * queryDist.
         float    normalBeta = 8.0f;                 ///< β: exponent on the normal compatibility term max(n·n', 0)^β.
-        bool     useNeighborRejection = true;       ///< Stop sampling early when a candidate scores ≥ earlyStopCutoff.
+        bool     useEarlyStopping = true;           ///< Stop sampling early when a candidate scores ≥ earlyStopCutoff.
         float    earlyStopCutoff = 0.5f;            ///< Score threshold for early stopping.
     };
 
@@ -267,7 +267,7 @@ private:
     std::vector<ref<Buffer>>        mMultiReservoirIndices;                 ///< Which cell a reservoir was multi-scattered into, and its corresponding index.
     std::vector<ref<Buffer>>        mMultiScatteredReservoirs;              ///< The multi-scattered reservoirs (in terms of pixels from the old frame).
     std::vector<ref<Buffer>>        mMultiCellOffsets;                      ///< The beginning index of each cell in a linearized buffer.
-    std::vector<ref<Buffer>>        mMultiSortedReservoirs;                 ///> Linearized, sorted buffer of all reservoirs.
+    std::vector<ref<Buffer>>        mMultiSortedReservoirs;                 ///< Linearized, sorted buffer of all reservoirs.
 
     // Temporal scatter visualization
     bool                            mDumpScatterCount = false;              ///< Dump the scatter count on next run.

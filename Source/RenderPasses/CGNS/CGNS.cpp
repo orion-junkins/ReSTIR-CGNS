@@ -63,11 +63,10 @@ namespace
     const std::string kGenerateCGNSGBufferFile = "RenderPasses/CGNS/GenerateCGNSGBuffer.cs.slang";
     const std::string kSelectNeighborsFile     = "RenderPasses/CGNS/SelectNeighbors.cs.slang";
 
-    // Must match kWRSMaxCapacity in WRSReservoir.slang.
+    // Must match AESReservoir::kMaxCapacity in WRSReservoir.slang.
     constexpr uint32_t kWRSMaxCapacity = 5;
 
     // Render pass inputs and outputs.
-
     const std::string kInputVBuffer = "vbuffer";
     const std::string kInputMotionVectors = "mvec";
     const std::string kInputViewDir = "viewW";
@@ -665,10 +664,10 @@ bool CGNS::renderReSTIRUI(Gui::Widgets& widget)
                 dirty |= cgns.var("Normal Beta", mReSTIRParams.normalBeta, 0.0f, 32.0f);
                 cgns.tooltip("Exponent beta on the normal compatibility term max(n.n', 0)^beta.", true);
 
-                dirty |= cgns.checkbox("Early Stop on High Compatibility", mReSTIRParams.useNeighborRejection);
-                cgns.tooltip("Stop sampling candidates once one scores above the cutoff.", true);
+                dirty |= cgns.checkbox("Early Stop on High Compatibility", mReSTIRParams.useEarlyStopping);
+                cgns.tooltip("Stops early once enough high-quality candidates are found.", true);
 
-                if (mReSTIRParams.useNeighborRejection)
+                if (mReSTIRParams.useEarlyStopping)
                 {
                     dirty |= cgns.var("Early Stop Cutoff", mReSTIRParams.earlyStopCutoff, 0.0f, 1.0f);
                     cgns.tooltip("Compatibility score threshold for early stopping.", true);
@@ -1409,7 +1408,7 @@ void CGNS::prepareResources(RenderContext* pRenderContext, const RenderData& ren
         mpCgnsGBuffer = nullptr;
     }
 
-    // CGNS — neighbor selection buffer: one int2 per pixel.
+    // CGNS — neighbor selection buffer: M int2s per pixel (stride = neighborCount).
     if (mReSTIRParams.enableSpatialResampling)
     {
         uint32_t pixelCount = mParams.frameDim.x * mParams.frameDim.y;
@@ -2109,11 +2108,10 @@ void CGNS::selectNeighbors(RenderContext* pRenderContext, const RenderData& rend
     var["gSpatialRoundId"]         = (int)iteration;
     var["gNeighborCandidateCount"] = (int)mReSTIRParams.neighborCandidateCount;
     var["gM"]                      = (int)mReSTIRParams.neighborCount;
-    var["gStride"]                 = (uint32_t)mReSTIRParams.neighborCount;
     var["gGatherRadius"]           = mReSTIRParams.spatialGatherRadius;
     var["gScaleSolidAngle"]        = mReSTIRParams.scaleSolidAngle;
     var["gNormalBeta"]             = mReSTIRParams.normalBeta;
-    var["gUseNeighborRejection"]   = mReSTIRParams.useNeighborRejection;
+    var["gUseEarlyStopping"]       = mReSTIRParams.useEarlyStopping;
     var["gEarlyStopCutoff"]        = mReSTIRParams.earlyStopCutoff;
 
     mpSelectNeighborsPass->execute(pRenderContext, {mParams.frameDim.x, mParams.frameDim.y, 1});
